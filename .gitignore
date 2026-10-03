@@ -1,0 +1,21 @@
+# .NET build output
+bin/
+obj/
+
+# macOS
+.DS_Store
+
+# Visual Studio / VS Code
+.vs/
+.vscode/
+
+# User-specific files
+*.user
+*.suo
+
+# Environment files / secrets
+.env
+.env.*
+
+# Logs
+*.log

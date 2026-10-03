@@ -1,0 +1,79 @@
+@page "/request-leave"
+
+@using EmployeeLeavePortal.Data
+@using EmployeeLeavePortal.Models
+@using Microsoft.EntityFrameworkCore
+@inject AppDbContext Db
+@inject NavigationManager Navigation
+
+<PageTitle>Request Leave</PageTitle>
+
+<h1>Request Leave</h1>
+
+@if (employee == null)
+{
+    <p>Loading employee...</p>
+}
+else
+{
+    <EditForm Model="leaveRequest" OnValidSubmit="SubmitRequest" FormName="LeaveRequestForm">
+        <div class="mb-3">
+            <label>Leave Type</label>
+            <InputSelect @bind-Value="leaveRequest.Type" class="form-control">
+                <option value="Vacation">Vacation</option>
+                <option value="Sick Leave">Sick Leave</option>
+                <option value="Other">Other</option>
+            </InputSelect>
+        </div>
+
+        <div class="mb-3">
+            <label>Start Date</label>
+            <InputDate @bind-Value="leaveRequest.StartDate" class="form-control" />
+        </div>
+
+        <div class="mb-3">
+            <label>End Date</label>
+            <InputDate @bind-Value="leaveRequest.EndDate" class="form-control" />
+        </div>
+
+        <div class="mb-3">
+            <label>Comment</label>
+            <InputTextArea @bind-Value="leaveRequest.Comment" class="form-control" />
+        </div>
+
+        <button type="submit" class="btn btn-primary">
+            Submit Request
+        </button>
+    </EditForm>
+}
+
+@code {
+    private Employee? employee;
+
+    private LeaveRequest leaveRequest = new()
+    {
+        Type = "Vacation",
+        StartDate = DateOnly.FromDateTime(DateTime.Today),
+        EndDate = DateOnly.FromDateTime(DateTime.Today)
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        employee = await Db.Employees.FirstOrDefaultAsync();
+
+        if (employee != null)
+        {
+            leaveRequest.EmployeeId = employee.Id;
+        }
+    }
+
+    private async Task SubmitRequest()
+    {
+        leaveRequest.Status = "Pending";
+
+        Db.LeaveRequests.Add(leaveRequest);
+        await Db.SaveChangesAsync();
+
+        Navigation.NavigateTo("/dashboard");
+    }
+}

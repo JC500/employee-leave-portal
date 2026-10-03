@@ -1,0 +1,142 @@
+@page "/manager"
+@rendermode InteractiveServer
+
+@using EmployeeLeavePortal.Data
+@using EmployeeLeavePortal.Models
+@using Microsoft.EntityFrameworkCore
+@inject AppDbContext Db
+
+<PageTitle>Manager Dashboard</PageTitle>
+
+<h1>Manager Dashboard</h1>
+
+<h3>Leave Requests</h3>
+
+@if (errorMessage != null)
+{
+    <div class="alert alert-danger">
+        @errorMessage
+    </div>
+}
+
+@if (leaveRequests.Count == 0)
+{
+    <p>There are no leave requests.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Employee</th>
+                <th>Type</th>
+                <th>Start Date</th>
+                <th>End Date</th>
+                <th>Comment</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            @foreach (var request in leaveRequests)
+            {
+                <tr>
+                    <td>@request.Employee?.Name</td>
+                    <td>@request.Type</td>
+                    <td>@request.StartDate.ToString("dd.MM.yyyy")</td>
+                    <td>@request.EndDate.ToString("dd.MM.yyyy")</td>
+                    <td>@request.Comment</td>
+                    <td>@request.Status</td>
+
+                    <td>
+                        @if (request.Status == "Pending")
+                        {
+                            <button class="btn btn-success btn-sm me-2"
+                                    @onclick="() => ApproveRequest(request)">
+                                Approve
+                            </button>
+
+                            <button class="btn btn-danger btn-sm"
+                                    @onclick="() => RejectRequest(request)">
+                                Reject
+                            </button>
+                        }   
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<LeaveRequest> leaveRequests = [];
+
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        leaveRequests = await Db.LeaveRequests
+            .Include(request => request.Employee)
+            .OrderByDescending(request => request.StartDate)
+            .ToListAsync();
+    }
+
+    private async Task UpdateStatus(LeaveRequest request, string status)
+    {
+        request.Status = status;
+
+        await Db.SaveChangesAsync();
+    }
+    private async Task ApproveRequest(LeaveRequest request)
+    {
+        errorMessage = null;
+
+        if (request.Type == "Vacation")
+        {
+            Employee? employee = await Db.Employees
+                .FirstOrDefaultAsync(employee => employee.Id == request.EmployeeId);
+
+            if (employee == null)
+            {
+                errorMessage = "Employee could not be found.";
+                return;
+            }
+
+            int requestedDays = CalculateWorkingDays(
+                request.StartDate,
+                request.EndDate);
+
+            if (requestedDays > employee.VacationDays)
+            {
+                errorMessage = $"Not enough vacation days. The employee has {employee.VacationDays} days available, but the request requires {requestedDays}.";
+                return;
+            }
+
+            employee.VacationDays -= requestedDays;
+        }
+
+        await UpdateStatus(request, "Approved");
+    }
+
+    private async Task RejectRequest(LeaveRequest request)
+    {
+        await UpdateStatus(request, "Rejected");
+    }
+
+    private int CalculateWorkingDays(DateOnly startDate, DateOnly endDate)
+    {
+        int workingDays = 0;
+
+        for (DateOnly date = startDate; date <= endDate; date = date.AddDays(1))
+        {
+            if (date.DayOfWeek != DayOfWeek.Saturday &&
+                date.DayOfWeek != DayOfWeek.Sunday)
+            {
+                workingDays++;
+            }
+        }
+
+        return workingDays;
+    }
+}
